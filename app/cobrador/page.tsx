@@ -1,30 +1,37 @@
-'use client'
+// app/cobrador/page.tsx
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { CollectorApp } from '@/components/collector-app'
-import { AuthSession } from '@/lib/types'
-import { getCurrentSession, logout } from '@/lib/store'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { CollectorApp } from "@/components/collector-app";
+import { AuthSession } from "@/lib/types";
+import { getCurrentSession, logout } from "@/lib/store";
 
 export default function CobradorPage() {
-  const router = useRouter()
-  const [session, setSession] = useState<AuthSession | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter();
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const saved = getCurrentSession()
-    if (!saved || saved.userType !== 'collector') {
-      router.push('/')
-      return
+    // Solo se ejecuta en el cliente, así que localStorage/sessionStorage es seguro aquí.[web:73][web:78]
+    try {
+      const saved = getCurrentSession();
+
+      if (!saved || saved.userType !== "collector") {
+        router.replace("/"); // replace para no dejar el historial roto
+        return;
+      }
+
+      setSession(saved);
+    } finally {
+      setIsLoading(false);
     }
-    setSession(saved)
-    setIsLoading(false)
-  }, [router])
+  }, [router]);
 
   const handleLogout = () => {
-    logout()
-    router.push('/')
-  }
+    logout();
+    router.replace("/");
+  };
 
   if (isLoading || !session) {
     return (
@@ -34,8 +41,8 @@ export default function CobradorPage() {
           <p className="text-primary-foreground font-medium">Cargando...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  return <CollectorApp session={session} onLogout={handleLogout} />
+  return <CollectorApp session={session} onLogout={handleLogout} />;
 }
