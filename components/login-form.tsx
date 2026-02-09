@@ -144,8 +144,8 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                   <div className="flex items-center justify-between p-2 bg-card rounded-lg border border-border">
                     <span className="text-muted-foreground font-medium">Oficina:</span>
                     <div className="text-right">
-                      <p className="font-mono text-foreground text-xs">admin@gotaagota.com</p>
-                      <p className="font-mono text-foreground text-xs">admin123</p>
+                      <p className="font-mono text-foreground text-xs">chito</p>
+                      <p className="font-mono text-foreground text-xs">cobranzas</p>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
