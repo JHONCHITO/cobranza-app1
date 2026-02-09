@@ -1,26 +1,25 @@
-'use client'
+"use client";
 
-import React from "react"
+import React, { useEffect, useState } from "react";
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -28,123 +27,164 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
-import { Client, Collector } from '@/lib/types'
-import { 
-  getClients, 
-  saveClient, 
-  deleteClient, 
-  getCollectors,
-  generateId 
-} from '@/lib/store'
+} from "@/components/ui/table";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Client, Collector } from "@/lib/types";
+import { getCollectors } from "@/lib/store";
 
 interface ClientsModuleProps {
-  collectorFilter?: string
-  readOnly?: boolean
+  collectorFilter?: string;
+  readOnly?: boolean;
 }
 
 export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModuleProps) {
-  const [clients, setClients] = useState<Client[]>([])
-  const [collectors, setCollectors] = useState<Collector[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingClient, setEditingClient] = useState<Client | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    cedula: '',
-    email: '',
-    collectorId: '',
-    status: 'active' as const,
-  })
+  const [clients, setClients] = useState<Client[]>([]);
+  const [collectors, setCollectors] = useState<Collector[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [formData, setFormData] = useState<{
+    name: string;
+    phone: string;
+    address: string;
+    cedula: string;
+    email: string;
+    collectorId: string;
+    status: string;
+  }>({
+    name: "",
+    phone: "",
+    address: "",
+    cedula: "",
+    email: "",
+    collectorId: "",
+    status: "active",
+  });
 
   useEffect(() => {
-    loadData()
-  }, [])
+    loadData();
+  }, [collectorFilter]);
 
-  const loadData = () => {
-    let allClients = getClients()
-    if (collectorFilter) {
-      allClients = allClients.filter(c => c.collectorId === collectorFilter)
+  const loadData = async () => {
+    try {
+      const params = collectorFilter ? `?collectorId=${collectorFilter}` : "";
+      const res = await fetch(`/api/clients${params}`);
+      const data: Client[] = await res.json();
+      setClients(data);
+    } catch (error) {
+      console.error("Error cargando clientes:", error);
+      setClients([]);
     }
-    setClients(allClients)
-    setCollectors(getCollectors())
-  }
 
-  const filteredClients = clients.filter(client =>
+    setCollectors(getCollectors());
+  };
+
+  const filteredClients = clients.filter((client) =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.cedula.includes(searchTerm) ||
     client.phone.includes(searchTerm)
-  )
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const clientData: Client = {
-      id: editingClient?.id || generateId(),
-      ...formData,
-      createdAt: editingClient?.createdAt || new Date().toISOString(),
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const payload: any = {
+        ...formData,
+      };
+
+      if (editingClient?.id) {
+        payload.id = editingClient.id;
+        payload._update = true;
+      }
+
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.error("Error al guardar cliente");
+        return;
+      }
+
+      await loadData();
+      resetForm();
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error("Error en handleSubmit:", error);
     }
-    saveClient(clientData)
-    loadData()
-    resetForm()
-    setIsDialogOpen(false)
-  }
+  };
 
   const handleEdit = (client: Client) => {
-    setEditingClient(client)
+    setEditingClient(client);
     setFormData({
       name: client.name,
       phone: client.phone,
       address: client.address,
       cedula: client.cedula,
-      email: client.email || '',
+      email: client.email || "",
       collectorId: client.collectorId,
-      status: client.status,
-    })
-    setIsDialogOpen(true)
-  }
+      status: client.status || "active",
+    });
+    setIsDialogOpen(true);
+  };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Esta seguro de eliminar este cliente?')) {
-      deleteClient(id)
-      loadData()
+  const handleDelete = async (id: string) => {
+    if (!confirm("Esta seguro de eliminar este cliente?")) return;
+
+    try {
+      const res = await fetch(`/api/clients?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        console.error("Error al eliminar cliente");
+        return;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Error en handleDelete:", error);
     }
-  }
+  };
 
   const resetForm = () => {
-    setEditingClient(null)
+    setEditingClient(null);
     setFormData({
-      name: '',
-      phone: '',
-      address: '',
-      cedula: '',
-      email: '',
-      collectorId: '',
-      status: 'active',
-    })
-  }
+      name: "",
+      phone: "",
+      address: "",
+      cedula: "",
+      email: "",
+      collectorId: "",
+      status: "active",
+    });
+  };
 
   const getCollectorName = (collectorId: string) => {
-    const collector = collectors.find(c => c.id === collectorId)
-    return collector?.name || 'Sin asignar'
-  }
+    const collector = collectors.find((c) => c.id === collectorId);
+    return collector?.name || "Sin asignar";
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
-            {collectorFilter ? 'Mis Clientes' : 'Clientes'}
+            {collectorFilter ? "Mis Clientes" : "Clientes"}
           </h2>
           <p className="text-muted-foreground">Gestiona los clientes del sistema</p>
         </div>
         {!readOnly && (
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open)
-            if (!open) resetForm()
-          }}>
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="w-4 h-4" />
@@ -154,7 +194,7 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {editingClient ? 'Editar Cliente' : 'Nuevo Cliente'}
+                  {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -163,7 +203,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -172,7 +214,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                   <Input
                     id="cedula"
                     value={formData.cedula}
-                    onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cedula: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -181,7 +225,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -191,7 +237,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -199,7 +247,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                   <Input
                     id="address"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -208,7 +258,9 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                     <Label htmlFor="collector">Cobrador Asignado</Label>
                     <Select
                       value={formData.collectorId}
-                      onValueChange={(value) => setFormData({ ...formData, collectorId: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, collectorId: value })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar cobrador" />
@@ -227,7 +279,7 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                   <Label htmlFor="status">Estado</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: 'active' | 'inactive') => 
+                    onValueChange={(value) =>
                       setFormData({ ...formData, status: value })
                     }
                   >
@@ -242,11 +294,11 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                 </div>
                 <div className="flex gap-2 pt-4">
                   <Button type="submit" className="flex-1">
-                    {editingClient ? 'Actualizar' : 'Guardar'}
+                    {editingClient ? "Actualizar" : "Guardar"}
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsDialogOpen(false)}
                   >
                     Cancelar
@@ -284,33 +336,46 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
                 <TableHead>Direccion</TableHead>
                 {!collectorFilter && <TableHead>Cobrador</TableHead>}
                 <TableHead>Estado</TableHead>
-                {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
+                {!readOnly && (
+                  <TableHead className="text-right">Acciones</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={collectorFilter ? 6 : 7} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={collectorFilter ? 6 : 7}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     No hay clientes registrados
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredClients.map((client) => (
                   <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {client.name}
+                    </TableCell>
                     <TableCell>{client.cedula}</TableCell>
                     <TableCell>{client.phone}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{client.address}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {client.address}
+                    </TableCell>
                     {!collectorFilter && (
-                      <TableCell>{getCollectorName(client.collectorId)}</TableCell>
+                      <TableCell>
+                        {getCollectorName(client.collectorId)}
+                      </TableCell>
                     )}
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        client.status === 'active' 
-                          ? 'bg-accent/20 text-accent' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {client.status === 'active' ? 'Activo' : 'Inactivo'}
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          client.status === "active"
+                            ? "bg-accent/20 text-accent"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {client.status === "active" ? "Activo" : "Inactivo"}
                       </span>
                     </TableCell>
                     {!readOnly && (
@@ -341,5 +406,5 @@ export function ClientsModule({ collectorFilter, readOnly = false }: ClientsModu
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
